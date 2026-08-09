@@ -1,5 +1,5 @@
 ---
-version: "1.0.0"
+version: "1.0.1"
 slug: nginx
 name: NGINX SSL proxy
 description: Dual-hostname TLS reverse proxy for Home Assistant
