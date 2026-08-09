@@ -1,0 +1,37 @@
+---
+version: "1.0.0"
+slug: coturn
+name: Coturn
+description: TURN/STUN server for WebRTC remote camera relay
+url: https://github.com/rwjack/addons
+arch:
+  - aarch64
+  - amd64
+startup: services
+boot: auto
+init: false
+host_network: true
+map:
+  - ssl
+options:
+  username: turnuser
+  password: ""
+  realm: turn.local
+  listening_ip: ""
+  external_ip: ""
+  min_port: 48000
+  max_port: 49000
+  use_tls: false
+  cert_file: fullchain.pem
+  key_file: privkey.pem
+schema:
+  username: str
+  password: password
+  realm: str
+  listening_ip: str
+  external_ip: str
+  min_port: int
+  max_port: int
+  use_tls: bool
+  cert_file: str
+  key_file: str

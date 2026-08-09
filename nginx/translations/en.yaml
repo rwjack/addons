@@ -1,0 +1,13 @@
+configuration:
+  domains:
+    name: Domains
+    description: FQDNs that terminate TLS (remote and/or local hostnames).
+  certfile:
+    name: Certificate file
+    description: Certificate filename under /ssl.
+  keyfile:
+    name: Private key file
+    description: Private key filename under /ssl.
+  hsts:
+    name: HSTS
+    description: Strict-Transport-Security header value (empty to disable).

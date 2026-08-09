@@ -1,0 +1,23 @@
+configuration:
+  username:
+    name: Username
+  password:
+    name: Password
+  realm:
+    name: Realm
+  listening_ip:
+    name: Listening IP
+    description: Local IP for Coturn bind and relay.
+  external_ip:
+    name: External IP
+    description: Public IP advertised to WebRTC clients.
+  min_port:
+    name: Relay min port
+  max_port:
+    name: Relay max port
+  use_tls:
+    name: TURN over TLS
+  cert_file:
+    name: Certificate file
+  key_file:
+    name: Private key file
