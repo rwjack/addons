@@ -42,8 +42,7 @@ ARGS=(
 )
 
 # Coturn only exposes -v / -V (no real log-level). Alpine still emits some
-# DEBUG-tagged allocation lines at default verbosity; do not pipe through
-# BusyBox grep (no --line-buffered) — that broke startup.
+# DEBUG-tagged allocation lines at default verbosity.
 case "$LOG_LEVEL" in
   verbose) ARGS+=(-v) ;;
   debug) ARGS+=(-V) ;;
@@ -70,6 +69,39 @@ if [[ "$USE_TLS" == "true" ]]; then
     bashio::log.warning \
       "use_tls is set but /ssl/${CERT_FILE} or /ssl/${KEY_FILE} is missing; starting without TLS."
   fi
+fi
+
+# Strip ": DEBUG:" lines at info without GNU grep --line-buffered (BusyBox).
+# Fifo keeps turnserver's PID trackable so s6 SIGTERM still reaches it.
+_filter_debug_lines() {
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    case "$line" in
+      *': DEBUG:'*) ;;
+      *) printf '%s\n' "$line" ;;
+    esac
+  done
+}
+
+if [[ "$LOG_LEVEL" == "info" ]]; then
+  fifo="/tmp/coturn-log.$$.fifo"
+  rm -f "$fifo"
+  mkfifo "$fifo"
+  _filter_debug_lines <"$fifo" &
+  filter_pid=$!
+  turnserver "${ARGS[@]}" >"$fifo" 2>&1 &
+  turn_pid=$!
+  _forward() {
+    kill -TERM "$turn_pid" 2>/dev/null || true
+    wait "$turn_pid" 2>/dev/null || true
+    kill "$filter_pid" 2>/dev/null || true
+    rm -f "$fifo"
+  }
+  trap _forward TERM INT
+  wait "$turn_pid"
+  rc=$?
+  kill "$filter_pid" 2>/dev/null || true
+  rm -f "$fifo"
+  exit "$rc"
 fi
 
 exec turnserver "${ARGS[@]}"

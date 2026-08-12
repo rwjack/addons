@@ -31,5 +31,5 @@ configuration:
   log_level:
     name: Log level
     description: >-
-      info is Coturn's default (no -v). verbose adds -v; debug adds -V.
-      Alpine may still print some DEBUG-tagged allocation lines at info.
+      info filters Coturn ": DEBUG:" lines (BusyBox-safe). verbose adds -v;
+      debug adds -V.
