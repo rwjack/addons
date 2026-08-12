@@ -1,5 +1,5 @@
 ---
-version: "1.0.1"
+version: "1.0.2"
 slug: traefik
 name: Traefik SSL proxy
 description: Dual-hostname TLS reverse proxy for Home Assistant, with TURNS SNI passthrough for Coturn
@@ -10,7 +10,8 @@ arch:
 init: false
 hassio_api: true
 map:
-  - ssl
+  # certdump writes PEMs here for Coturn + cert-status; default ssl is read-only.
+  - ssl:rw
   - share
 options:
   domains:
