@@ -22,6 +22,7 @@ CERT_FILE="$(jq -r '.cert_file' "$OPTIONS_FILE")"
 KEY_FILE="$(jq -r '.key_file' "$OPTIONS_FILE")"
 
 ARGS=(
+  -n
   --no-cli
   --log-file=stdout
   --fingerprint
@@ -34,7 +35,8 @@ ARGS=(
   --min-port="$MIN_PORT"
   --max-port="$MAX_PORT"
   --no-multicast-peers
-  --no-loopback-peers
+  # Loopback peers are denied by default in modern coturn; --no-loopback-peers
+  # was removed (unrecognized option aborts startup).
   --stale-nonce
 )
 
