@@ -1,5 +1,5 @@
 ---
-version: "1.0.0"
+version: "1.1.0"
 slug: coturn
 name: Coturn
 description: TURN/STUN server for WebRTC remote camera relay
@@ -8,7 +8,7 @@ arch:
   - aarch64
   - amd64
 startup: services
-boot: auto
+boot: manual
 init: false
 host_network: true
 map:
@@ -22,6 +22,8 @@ options:
   min_port: 48000
   max_port: 49000
   use_tls: false
+  tls_listening_port: 5349
+  turn_domain: ""
   cert_file: fullchain.pem
   key_file: privkey.pem
 schema:
@@ -33,5 +35,7 @@ schema:
   min_port: int
   max_port: int
   use_tls: bool
+  tls_listening_port: int
+  turn_domain: str?
   cert_file: str
   key_file: str

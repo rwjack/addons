@@ -1,0 +1,54 @@
+---
+version: "1.0.0"
+slug: traefik
+name: Traefik SSL proxy
+description: Dual-hostname TLS reverse proxy for Home Assistant, with TURNS SNI passthrough for Coturn
+url: https://github.com/rwjack/addons
+arch:
+  - aarch64
+  - amd64
+init: false
+hassio_api: true
+map:
+  - ssl
+  - share
+options:
+  domains:
+    - home.example.com
+  turn_domain: ""
+  turn_domains: []
+  turn_upstream: ""
+  turn_upstream_port: 5349
+  email: ""
+  rfc2136_server: ""
+  rfc2136_port: "53"
+  rfc2136_name: ""
+  rfc2136_secret: ""
+  rfc2136_algorithm: "hmac-sha512."
+  certfile: fullchain.pem
+  keyfile: privkey.pem
+  hsts: "max-age=31536000; includeSubDomains"
+  coturn_slug: ""
+  acme_staging: false
+schema:
+  domains:
+    - str
+  turn_domain: str?
+  turn_domains:
+    - str?
+  turn_upstream: str?
+  turn_upstream_port: int?
+  email: str?
+  rfc2136_server: str?
+  rfc2136_port: str?
+  rfc2136_name: str?
+  rfc2136_secret: password?
+  rfc2136_algorithm: str?
+  certfile: str
+  keyfile: str
+  hsts: str
+  coturn_slug: str?
+  acme_staging: bool
+ports:
+  443/tcp: 443
+  80/tcp: null

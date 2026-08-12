@@ -1,0 +1,62 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+# nestfi-access-plan.md Phase 3. Replaces the old core_letsencrypt + nginx pair:
+# ACME (DNS-01/rfc2136) lives inside Traefik now, and a single dynamic-config
+# render handles both the e-/i- HTTP vhost and the t- TURNS SNI passthrough.
+
+OPTIONS_FILE="/data/options.json"
+PORT="$(bashio::core.port)"
+
+mkdir -p /etc/traefik/dynamic /data
+touch /data/acme.json
+chmod 600 /data/acme.json
+
+# Precompute the fiddly bits with jq so the Go templates stay flat (if/range
+# on plain fields only — no index/or, which keeps this portable across
+# tempio's template engine version).
+JSON_CONF="$(
+  jq --argjson port "${PORT}" '
+    ({options: .})
+    + ({variables: {
+        port: $port,
+        turn_upstream: (
+          if (.turn_upstream // "") == "" then "172.30.32.1" else .turn_upstream end
+        ),
+        cert_main: (.domains[0] // ""),
+        cert_sans: (
+          (.domains[1:] // [])
+          + (if (.turn_domain // "") != "" then [.turn_domain] else [] end)
+        ),
+        host_rule: ([.domains[] | "Host(`" + . + "`)"] | join(" || ")),
+        turn_sni: (.turn_domains[0] // "")
+      }})
+  ' "$OPTIONS_FILE"
+)"
+
+echo "${JSON_CONF}" | tempio \
+  -template /etc/traefik/static.yaml.gtpl \
+  -out /data/traefik-static.yaml
+
+echo "${JSON_CONF}" | tempio \
+  -template /etc/traefik/dynamic.yaml.gtpl \
+  -out /etc/traefik/dynamic/nestfi.yaml
+
+# lego's rfc2136 provider reads env vars, not a config key (nestfi-access-plan.md
+# §3.5). Use the _FILE suffix so the secret itself never sits in the process
+# environment — write it to a 0600 file under /data instead.
+SECRET_FILE="/data/.rfc2136_secret"
+jq -r '.rfc2136_secret // ""' "$OPTIONS_FILE" > "$SECRET_FILE"
+chmod 600 "$SECRET_FILE"
+
+export RFC2136_NAMESERVER="$(jq -r '"\(.rfc2136_server):\(.rfc2136_port)"' "$OPTIONS_FILE")"
+export RFC2136_TSIG_KEY="$(jq -r '.rfc2136_name // ""' "$OPTIONS_FILE")"
+export RFC2136_TSIG_SECRET_FILE="$SECRET_FILE"
+export RFC2136_TSIG_ALGORITHM="$(jq -r '.rfc2136_algorithm // "hmac-sha512."' "$OPTIONS_FILE")"
+# nestfi.rs / acme.nestfi.rs are also served by a secondary (dns.itp.rs); the
+# challenge TXT must survive a zone transfer before lego gives up.
+export RFC2136_PROPAGATION_TIMEOUT="${RFC2136_PROPAGATION_TIMEOUT:-180}"
+export RFC2136_POLLING_INTERVAL="${RFC2136_POLLING_INTERVAL:-5}"
+
+exec traefik --configFile=/data/traefik-static.yaml

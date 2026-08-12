@@ -1,0 +1,64 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+
+# nestfi-access-plan.md §3.2. Traefik stores certs in a single acme.json blob;
+# coturn needs PEM files on disk (--cert/--pkey) and collect_nestfi_ssl_cert_status
+# reads /ssl/fullchain.pem. This service watches acme.json and keeps the PEMs
+# in sync, restarting coturn the moment a new cert lands — which removes the
+# "coturn serves a stale cert after renewal" failure mode entirely rather than
+# just mitigating it.
+
+OPTIONS_FILE="/data/options.json"
+ACME_FILE="/data/acme.json"
+CERT_FILE="/ssl/$(jq -r '.certfile' "$OPTIONS_FILE")"
+KEY_FILE="/ssl/$(jq -r '.keyfile' "$OPTIONS_FILE")"
+COTURN_SLUG="$(jq -r '.coturn_slug // ""' "$OPTIONS_FILE")"
+
+dump_once() {
+  [[ -s "$ACME_FILE" ]] || return 0
+
+  # "nestfi" is the certResolver name from static.yaml.gtpl.
+  local cert_b64 key_b64
+  cert_b64="$(jq -r '.nestfi.Certificates[0].certificate // empty' "$ACME_FILE" 2>/dev/null || true)"
+  key_b64="$(jq -r '.nestfi.Certificates[0].key // empty' "$ACME_FILE" 2>/dev/null || true)"
+  [[ -n "$cert_b64" && -n "$key_b64" ]] || return 0
+
+  # mktemp in /ssl (same filesystem as the target) so the final mv is atomic —
+  # readers (coturn, collect_nestfi_ssl_cert_status) never see a partial file.
+  local tmp_cert tmp_key
+  tmp_cert="$(mktemp -p /ssl certdump.XXXXXX.crt)"
+  tmp_key="$(mktemp -p /ssl certdump.XXXXXX.key)"
+  echo "$cert_b64" | base64 -d > "$tmp_cert" 2>/dev/null || { rm -f "$tmp_cert" "$tmp_key"; return 0; }
+  echo "$key_b64" | base64 -d > "$tmp_key" 2>/dev/null || { rm -f "$tmp_cert" "$tmp_key"; return 0; }
+
+  if [[ -s "$CERT_FILE" ]] && cmp -s "$tmp_cert" "$CERT_FILE"; then
+    rm -f "$tmp_cert" "$tmp_key"
+    return 0
+  fi
+
+  chmod 644 "$tmp_cert"
+  chmod 600 "$tmp_key"
+  mv -f "$tmp_cert" "$CERT_FILE"
+  mv -f "$tmp_key" "$KEY_FILE"
+  bashio::log.info "certdump: wrote new certificate to ${CERT_FILE}"
+
+  if [[ -n "$COTURN_SLUG" && "$COTURN_SLUG" != "null" ]]; then
+    if curl -fsSL -X POST \
+        -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
+        "http://supervisor/addons/${COTURN_SLUG}/restart" >/dev/null; then
+      bashio::log.info "certdump: restarted ${COTURN_SLUG} for the new certificate"
+    else
+      bashio::log.warning "certdump: failed to restart ${COTURN_SLUG} (may not be running)"
+    fi
+  fi
+}
+
+# Initial pass in case acme.json already had a cert from a previous run.
+dump_once
+
+# inotifywait blocks between events; loop forever, re-checking on any write
+# activity in /data (cheap: dump_once() is a content-diff no-op otherwise).
+while inotifywait -q -e close_write -e moved_to -e create "$(dirname "$ACME_FILE")" >/dev/null 2>&1; do
+  dump_once
+done

@@ -17,6 +17,13 @@ configuration:
     name: Relay max port
   use_tls:
     name: TURN over TLS
+    description: Also listen for TURNS. Requires cert_file/key_file to exist under /ssl (Traefik's certdump writes these once ACME succeeds).
+  tls_listening_port:
+    name: TURNS port
+    description: Direct TLS port (5349). TURNS on 443 is reached separately, via the Traefik add-on's SNI passthrough route.
+  turn_domain:
+    name: TURN domain / realm
+    description: The t-<core>.ui.nestfi.rs SAN. Used as the TURN realm for diagnostics; not required to match the cert for RFC 8489 long-term credentials to work.
   cert_file:
     name: Certificate file
   key_file:

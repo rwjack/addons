@@ -1,5 +1,11 @@
-#!/usr/bin/env bash
+#!/command/with-contenv bashio
+# shellcheck shell=bash
 set -euo pipefail
+
+# nestfi-access-plan.md Phase 2 — rebased onto the HA base image + s6-overlay
+# so `addon stop`/restart sends SIGTERM through s6 and turnserver shuts down
+# relay allocations gracefully instead of being SIGKILLed (the alpine:3.20 +
+# bare CMD version had no supervisor at all).
 
 OPTIONS_FILE="/data/options.json"
 
@@ -11,6 +17,7 @@ EXTERNAL_IP="$(jq -r '.external_ip' "$OPTIONS_FILE")"
 MIN_PORT="$(jq -r '.min_port' "$OPTIONS_FILE")"
 MAX_PORT="$(jq -r '.max_port' "$OPTIONS_FILE")"
 USE_TLS="$(jq -r '.use_tls' "$OPTIONS_FILE")"
+TLS_LISTENING_PORT="$(jq -r '.tls_listening_port // 5349' "$OPTIONS_FILE")"
 CERT_FILE="$(jq -r '.cert_file' "$OPTIONS_FILE")"
 KEY_FILE="$(jq -r '.key_file' "$OPTIONS_FILE")"
 
@@ -27,6 +34,7 @@ ARGS=(
   --min-port="$MIN_PORT"
   --max-port="$MAX_PORT"
   --no-multicast-peers
+  --no-loopback-peers
   --stale-nonce
 )
 
@@ -35,11 +43,21 @@ if [[ -n "$EXTERNAL_IP" && -n "$LISTENING_IP" && "$EXTERNAL_IP" != "null" && "$L
 fi
 
 if [[ "$USE_TLS" == "true" ]]; then
-  ARGS+=(
-    --tls-listening-port=5349
-    --cert="/ssl/$CERT_FILE"
-    --pkey="/ssl/$KEY_FILE"
-  )
+  if [[ -r "/ssl/$CERT_FILE" && -r "/ssl/$KEY_FILE" ]]; then
+    ARGS+=(
+      --tls-listening-port="$TLS_LISTENING_PORT"
+      --cert="/ssl/$CERT_FILE"
+      --pkey="/ssl/$KEY_FILE"
+      --no-tlsv1
+      --no-tlsv1_1
+    )
+  else
+    # Cert not on disk yet (e.g. Traefik hasn't finished its first ACME issuance,
+    # or the cert doesn't cover the t- SAN). Don't crash-loop the add-on over it —
+    # fall back to plain TURN on 3478 and let the next options push retry TLS.
+    bashio::log.warning \
+      "use_tls is set but /ssl/${CERT_FILE} or /ssl/${KEY_FILE} is missing; starting without TLS."
+  fi
 fi
 
 exec turnserver "${ARGS[@]}"

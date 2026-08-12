@@ -1,0 +1,43 @@
+configuration:
+  domains:
+    name: Domains
+    description: Hostnames that terminate TLS for Home Assistant (the e-/i- nestfi names).
+  turn_domain:
+    name: TURN domain (cert only)
+    description: The t-<core>.ui.nestfi.rs SAN. Always included on the certificate once provisioned, independent of whether TURNS routing is enabled.
+  turn_domains:
+    name: TURN domains (routed)
+    description: SNI names that get passed straight through to Coturn on 443. Empty = no TCP router at all (safe default; TURNS-on-443 disabled).
+  turn_upstream:
+    name: Coturn upstream IP
+    description: Coturn's listening_ip. Empty defaults to the host gateway (172.30.32.1).
+  turn_upstream_port:
+    name: Coturn upstream port
+    description: Coturn's tls_listening_port (5349).
+  email:
+    name: ACME account email
+  rfc2136_server:
+    name: RFC2136 nameserver
+    description: Public nameserver used for ACME DNS-01 (e.g. ns2.itp.rs). Do not use the internal split-horizon name here.
+  rfc2136_port:
+    name: RFC2136 port
+  rfc2136_name:
+    name: TSIG key name
+  rfc2136_secret:
+    name: TSIG secret
+  rfc2136_algorithm:
+    name: TSIG algorithm
+  certfile:
+    name: Certificate output filename
+    description: Written under /ssl by certdump; consumed by Coturn and by the integration's cert-status reader.
+  keyfile:
+    name: Private key output filename
+  hsts:
+    name: HSTS header value
+    description: Empty string disables the header.
+  coturn_slug:
+    name: Coturn add-on slug
+    description: certdump restarts this add-on when a new certificate is written. Empty skips the restart.
+  acme_staging:
+    name: Use Let's Encrypt staging
+    description: Point ACME at the LE staging directory. Use this while iterating — the production duplicate-certificate rate limit is easy to exhaust on a single home.
