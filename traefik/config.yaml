@@ -1,5 +1,5 @@
 ---
-version: "1.0.0"
+version: "1.0.1"
 slug: traefik
 name: Traefik SSL proxy
 description: Dual-hostname TLS reverse proxy for Home Assistant, with TURNS SNI passthrough for Coturn

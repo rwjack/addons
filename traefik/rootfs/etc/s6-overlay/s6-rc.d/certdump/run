@@ -26,9 +26,11 @@ dump_once() {
 
   # mktemp in /ssl (same filesystem as the target) so the final mv is atomic —
   # readers (coturn, collect_nestfi_ssl_cert_status) never see a partial file.
+  # BusyBox mktemp (Alpine) requires XXXXXX at the *end* of the template —
+  # certdump.XXXXXX.crt is rejected as "Invalid argument" and spams the log.
   local tmp_cert tmp_key
-  tmp_cert="$(mktemp -p /ssl certdump.XXXXXX.crt)"
-  tmp_key="$(mktemp -p /ssl certdump.XXXXXX.key)"
+  tmp_cert="$(mktemp -p /ssl certdump.crt.XXXXXX)"
+  tmp_key="$(mktemp -p /ssl certdump.key.XXXXXX)"
   echo "$cert_b64" | base64 -d > "$tmp_cert" 2>/dev/null || { rm -f "$tmp_cert" "$tmp_key"; return 0; }
   echo "$key_b64" | base64 -d > "$tmp_key" 2>/dev/null || { rm -f "$tmp_cert" "$tmp_key"; return 0; }
 
