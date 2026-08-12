@@ -20,6 +20,7 @@ USE_TLS="$(jq -r '.use_tls' "$OPTIONS_FILE")"
 TLS_LISTENING_PORT="$(jq -r '.tls_listening_port // 5349' "$OPTIONS_FILE")"
 CERT_FILE="$(jq -r '.cert_file' "$OPTIONS_FILE")"
 KEY_FILE="$(jq -r '.key_file' "$OPTIONS_FILE")"
+LOG_LEVEL="$(jq -r '.log_level // "info"' "$OPTIONS_FILE" | tr '[:upper:]' '[:lower:]')"
 
 ARGS=(
   -n
@@ -39,6 +40,12 @@ ARGS=(
   # was removed (unrecognized option aborts startup).
   --stale-nonce
 )
+
+case "$LOG_LEVEL" in
+  verbose) ARGS+=(-v) ;;
+  debug) ARGS+=(-V) ;;
+  info|*) ;;
+esac
 
 if [[ -n "$EXTERNAL_IP" && -n "$LISTENING_IP" && "$EXTERNAL_IP" != "null" && "$LISTENING_IP" != "null" ]]; then
   ARGS+=(--external-ip="$EXTERNAL_IP/$LISTENING_IP")
@@ -60,6 +67,27 @@ if [[ "$USE_TLS" == "true" ]]; then
     bashio::log.warning \
       "use_tls is set but /ssl/${CERT_FILE} or /ssl/${KEY_FILE} is missing; starting without TLS."
   fi
+fi
+
+# Alpine coturn tags allocation churn as DEBUG on stdout even without -v/-V.
+# For log_level=info, strip those lines so Supervisor stays readable. Forward
+# SIGTERM/SIGINT to turnserver so s6 stop remains graceful (turnserver is not
+# PID 1 when we filter).
+if [[ "$LOG_LEVEL" == "info" ]]; then
+  coproc _COTURN_FILTER { grep -v --line-buffered ': DEBUG:' ; }
+  turnserver "${ARGS[@]}" >&"${_COTURN_FILTER[1]}" 2>&1 &
+  turn_pid=$!
+  exec {_COTURN_FILTER[1]}>&-
+  _forward() {
+    kill -TERM "$turn_pid" 2>/dev/null || true
+    wait "$turn_pid" 2>/dev/null || true
+    kill "${_COTURN_FILTER_PID}" 2>/dev/null || true
+  }
+  trap _forward TERM INT
+  wait "$turn_pid"
+  rc=$?
+  kill "${_COTURN_FILTER_PID}" 2>/dev/null || true
+  exit "$rc"
 fi
 
 exec turnserver "${ARGS[@]}"

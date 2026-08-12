@@ -28,3 +28,8 @@ configuration:
     name: Certificate file
   key_file:
     name: Private key file
+  log_level:
+    name: Log level
+    description: >-
+      info hides Coturn DEBUG lines (allocation churn) in Supervisor logs.
+      verbose (-v) and debug (-V) pass through to turnserver.

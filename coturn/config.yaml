@@ -1,5 +1,5 @@
 ---
-version: "1.1.1"
+version: "1.1.2"
 slug: coturn
 name: Coturn
 description: TURN/STUN server for WebRTC remote camera relay
@@ -26,6 +26,7 @@ options:
   turn_domain: ""
   cert_file: fullchain.pem
   key_file: privkey.pem
+  log_level: info
 schema:
   username: str
   password: password
@@ -39,3 +40,4 @@ schema:
   turn_domain: str?
   cert_file: str
   key_file: str
+  log_level: list(info|verbose|debug)
