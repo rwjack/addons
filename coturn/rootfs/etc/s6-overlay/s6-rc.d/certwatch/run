@@ -1,0 +1,38 @@
+#!/usr/bin/with-contenv bash
+# Watch /ssl and restart turnserver when its certificate changes.
+#
+# turnserver reads the PEMs once at startup and has no reload, so a renewed
+# certificate is invisible to it until the process restarts. This used to be
+# done from the *traefik* add-on, which had to be granted `hassio_role: manager`
+# to call the Supervisor API against another add-on — an escalation path that
+# let the internet-facing TLS proxy start, stop and read the config (including
+# secrets) of every add-on on the box.
+#
+# Owning it here needs no Supervisor permissions at all, and works regardless of
+# what wrote the certificate: Traefik, a manual copy, or a backup restore.
+set -uo pipefail
+
+OPTIONS_FILE=/data/options.json
+CERT="/ssl/$(jq -r '.cert_file // "fullchain.pem"' "$OPTIONS_FILE")"
+KEY="/ssl/$(jq -r '.key_file // "privkey.pem"' "$OPTIONS_FILE")"
+
+# Hash the material rather than reacting to any write in /ssl — Home Assistant
+# and other add-ons keep their own certificates there, and a restart storm on an
+# unrelated file would drop live TURN sessions.
+fingerprint() { cat "$CERT" "$KEY" 2>/dev/null | sha256sum | cut -d' ' -f1; }
+
+last="$(fingerprint)"
+echo "[certwatch] watching ${CERT} for changes"
+
+while inotifywait -q -e close_write -e moved_to -e create -e delete_self /ssl >/dev/null 2>&1; do
+    now="$(fingerprint)"
+    [ "$now" = "$last" ] && continue
+    last="$now"
+    if [ -z "$now" ] || [ "$now" = "$(printf '' | sha256sum | cut -d' ' -f1)" ]; then
+        echo "[certwatch] certificate missing or empty; not restarting"
+        continue
+    fi
+    echo "[certwatch] certificate changed; restarting coturn"
+    s6-svc -r /run/service/coturn 2>/dev/null \
+        || echo "[certwatch] could not signal the coturn service"
+done

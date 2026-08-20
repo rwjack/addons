@@ -1,5 +1,5 @@
 ---
-version: "1.0.2"
+version: "1.0.3"
 slug: traefik
 name: Traefik SSL proxy
 description: Dual-hostname TLS reverse proxy for Home Assistant, with TURNS SNI passthrough for Coturn
@@ -29,6 +29,8 @@ options:
   certfile: fullchain.pem
   keyfile: privkey.pem
   hsts: "max-age=31536000; includeSubDomains"
+  # deprecated: coturn now watches /ssl itself. Kept so existing saved
+  # options still validate; nothing reads it.
   coturn_slug: ""
   acme_staging: false
 schema:

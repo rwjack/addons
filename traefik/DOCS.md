@@ -18,7 +18,7 @@ See `docs/nestfi-access-plan.md` for the full design and rollout.
 | `email` / `rfc2136_*` | ACME account + DNS-01 rfc2136 credentials |
 | `certfile` / `keyfile` | PEM filenames `certdump` writes under `/ssl` |
 | `hsts` | Strict-Transport-Security value (empty disables it) |
-| `coturn_slug` | Add-on slug `certdump` restarts on cert renewal |
+| `coturn_slug` | **Deprecated, unused.** Coturn watches `/ssl` itself since coturn 1.1.5. |
 | `acme_staging` | Use the LE staging directory — use this while iterating |
 
 ## How TLS routing works
@@ -39,7 +39,7 @@ See `docs/nestfi-access-plan.md` for the full design and rollout.
 Traefik keeps certificates in `/data/acme.json`. A second internal service, `certdump`,
 watches that file and writes plain PEM files under `/ssl` — because Coturn needs
 `--cert`/`--pkey` paths and the integration's cert-status reader expects
-`/ssl/fullchain.pem`. `certdump` also restarts the Coturn add-on (via `coturn_slug`)
+`/ssl/fullchain.pem`. The Coturn add-on watches `/ssl` and restarts itself
 the moment a new certificate lands, so a renewal never leaves Coturn serving a stale one.
 
 ## Home Assistant HTTP

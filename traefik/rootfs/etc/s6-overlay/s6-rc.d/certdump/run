@@ -13,7 +13,6 @@ OPTIONS_FILE="/data/options.json"
 ACME_FILE="/data/acme.json"
 CERT_FILE="/ssl/$(jq -r '.certfile' "$OPTIONS_FILE")"
 KEY_FILE="/ssl/$(jq -r '.keyfile' "$OPTIONS_FILE")"
-COTURN_SLUG="$(jq -r '.coturn_slug // ""' "$OPTIONS_FILE")"
 
 dump_once() {
   [[ -s "$ACME_FILE" ]] || return 0
@@ -45,15 +44,9 @@ dump_once() {
   mv -f "$tmp_key" "$KEY_FILE"
   bashio::log.info "certdump: wrote new certificate to ${CERT_FILE}"
 
-  if [[ -n "$COTURN_SLUG" && "$COTURN_SLUG" != "null" ]]; then
-    if curl -fsSL -X POST \
-        -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" \
-        "http://supervisor/addons/${COTURN_SLUG}/restart" >/dev/null; then
-      bashio::log.info "certdump: restarted ${COTURN_SLUG} for the new certificate"
-    else
-      bashio::log.warning "certdump: failed to restart ${COTURN_SLUG} (may not be running)"
-    fi
-  fi
+  # Coturn restarts itself: the coturn add-on watches /ssl and reloads when the
+  # certificate changes. Doing it from here required hassio_role: manager, which
+  # grants control over every add-on on the box — too much for a TLS proxy.
 }
 
 # Initial pass in case acme.json already had a cert from a previous run.
